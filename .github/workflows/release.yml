@@ -1,0 +1,69 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [windows-latest, macos-latest, ubuntu-latest]
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: 'npm'
+
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies (ubuntu only)
+        if: matrix.platform == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Install frontend dependencies
+        run: npm install
+
+      - name: Build the app
+        run: npm run tauri build
+
+      - name: Prepare release assets (Windows)
+        if: matrix.platform == 'windows-latest'
+        run: |
+          cd src-tauri/target/release/bundle/msi
+          Rename-Item -Path *.msi -NewName "har-analyser-${{ github.ref_name }}-windows-x64.msi"
+
+      - name: Prepare release assets (macOS)
+        if: matrix.platform == 'macos-latest'
+        run: |
+          cd src-tauri/target/release/bundle/macos
+          zip -r "har-analyser-${{ github.ref_name }}-macos-x64.zip" *.app
+
+      - name: Prepare release assets (Linux)
+        if: matrix.platform == 'ubuntu-latest'
+        run: |
+          cd src-tauri/target/release/bundle/appimage
+          mv *.AppImage "har-analyser-${{ github.ref_name }}-linux-x64.AppImage"
+          cd ../deb
+          mv *.deb "har-analyser-${{ github.ref_name }}-linux-x64.deb"
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            src-tauri/target/release/bundle/msi/har-analyser-${{ github.ref_name }}-windows-x64.msi
+            src-tauri/target/release/bundle/macos/har-analyser-${{ github.ref_name }}-macos-x64.zip
+            src-tauri/target/release/bundle/appimage/har-analyser-${{ github.ref_name }}-linux-x64.AppImage
+            src-tauri/target/release/bundle/deb/har-analyser-${{ github.ref_name }}-linux-x64.deb
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

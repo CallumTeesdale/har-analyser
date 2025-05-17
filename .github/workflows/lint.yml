@@ -1,0 +1,62 @@
+name: Lint
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: 'npm'
+
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Install frontend dependencies
+        run: npm install
+
+      - name: Install ESLint and TypeScript
+        run: npm install --save-dev eslint typescript @typescript-eslint/parser @typescript-eslint/eslint-plugin
+
+      - name: Create ESLint config if not exists
+        run: |
+          if [ ! -f .eslintrc.js ]; then
+            echo "module.exports = {
+              parser: '@typescript-eslint/parser',
+              plugins: ['@typescript-eslint'],
+              extends: [
+                'eslint:recommended',
+                'plugin:@typescript-eslint/recommended',
+                'plugin:react/recommended',
+                'plugin:react-hooks/recommended'
+              ],
+              settings: {
+                react: {
+                  version: 'detect'
+                }
+              },
+              rules: {
+                'react/react-in-jsx-scope': 'off'
+              }
+            };" > .eslintrc.js
+          fi
+
+      - name: Lint Frontend
+        run: npm run lint
+
+      - name: Lint Rust code
+        run: |
+          cd src-tauri
+          cargo fmt -- --check
+          cargo clippy -- -D warnings

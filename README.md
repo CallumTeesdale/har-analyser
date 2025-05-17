@@ -23,6 +23,26 @@ A cross-platform HTTP Archive (HAR) file analyzer built with Tauri, React, TypeS
 - [Rust](https://www.rust-lang.org/) (v1.60 or later)
 - [Tauri CLI](https://tauri.app/v1/guides/getting-started/prerequisites)
 
+### CI/CD
+
+This project uses GitHub Actions for continuous integration and deployment:
+
+- **CI Workflow**: Automatically builds the application on Windows, macOS, and Linux for every push to the main branch and pull requests.
+- **Lint Workflow**: Checks code quality using ESLint for TypeScript/React and rustfmt/clippy for Rust code.
+- **Release Workflow**: Automatically builds and publishes releases when a new tag is pushed.
+- **CodeQL Analysis**: Scans code for security vulnerabilities using GitHub's CodeQL engine.
+- **Dependabot**: Automatically creates pull requests to update dependencies for npm, Cargo, and GitHub Actions.
+
+To create a new release:
+
+1. Update the version in `package.json` and `src-tauri/Cargo.toml`
+2. Commit the changes
+3. Create and push a new tag:
+   ```
+   git tag v0.1.0
+   git push origin v0.1.0
+   ```
+
 ### Setup
 
 1. Clone the repository:
@@ -39,6 +59,12 @@ A cross-platform HTTP Archive (HAR) file analyzer built with Tauri, React, TypeS
 3. Run the development server:
    ```
    npm run tauri dev
+   ```
+
+4. Lint your code:
+   ```
+   npm run lint        # Check for linting issues
+   npm run lint:fix    # Fix linting issues automatically
    ```
 
 ### Building
