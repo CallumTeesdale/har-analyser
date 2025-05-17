@@ -1,5 +1,4 @@
 name: Release
-
 on:
   push:
     tags:
@@ -7,6 +6,8 @@ on:
 
 jobs:
   release:
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
