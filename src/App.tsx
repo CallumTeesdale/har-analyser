@@ -14,7 +14,6 @@ import { Label } from "./components/ui/label";
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
-// Define TypeScript interfaces for HAR file structure
 interface HarFile {
   log: HarLog;
 }
@@ -144,47 +143,38 @@ function App() {
   const [filterMethod, setFilterMethod] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [darkMode, setDarkMode] = useState<boolean>(() => {
-    // Check if user has a preference stored
     const savedPreference = localStorage.getItem("darkMode");
     if (savedPreference !== null) {
       return savedPreference === "true";
     }
-    // Otherwise check system preference
     return window.matchMedia("(prefers-color-scheme: dark)").matches;
   });
 
-  // Apply dark mode class to document
   React.useEffect(() => {
     if (darkMode) {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
     }
-    // Save preference to localStorage
     localStorage.setItem("darkMode", darkMode.toString());
   }, [darkMode]);
 
-  // Function to toggle dark mode
   const toggleDarkMode = () => {
     setDarkMode(prev => !prev);
   };
 
-  // Function to open and load a HAR file
   async function openHarFile() {
     try {
-      // Open file dialog to select a HAR file
       const selected = await open({
         multiple: false,
         filters: [{ name: 'HAR Files', extensions: ['har'] }]
       });
 
       if (selected && !Array.isArray(selected)) {
-        // Read the file content
         const content = await readTextFile(selected);
         const harData = JSON.parse(content) as HarFile;
         setHarFile(harData);
 
-        // Reset selected entry and other state
         setSelectedEntry(null);
         setEditedRequest(null);
         setReplayResponse(null);
@@ -194,10 +184,8 @@ function App() {
     }
   }
 
-  // Function to replay a request
   async function replayRequest(request: HarRequest) {
     try {
-      // Convert camelCase fields to snake_case for Rust backend
       const rustRequest = {
         ...request,
         http_version: request.httpVersion,
@@ -215,7 +203,6 @@ function App() {
         body_size: request.bodySize
       };
 
-      // Remove the original camelCase fields to avoid duplicates
       delete (rustRequest as any).httpVersion;
       delete (rustRequest as any).queryString;
       if (rustRequest.post_data) {
@@ -237,12 +224,10 @@ function App() {
     }
   }
 
-  // Function to format headers as a string
   function formatHeaders(headers: HarHeader[]): string {
     return headers.map(h => `${h.name}: ${h.value}`).join('\n');
   }
 
-  // Function to export request/response data
   function exportRequestData(entry: HarEntry) {
     const exportData = {
       request: {
@@ -271,7 +256,6 @@ function App() {
     const a = document.createElement('a');
     a.href = url;
 
-    // Create a filename based on the request
     let filename;
     try {
       const urlObj = new URL(entry.request.url);
@@ -289,7 +273,6 @@ function App() {
     URL.revokeObjectURL(url);
   }
 
-  // Function to determine content type and format accordingly
   function formatContent(content: HarContent): JSX.Element {
     if (!content.text) {
       return <div>No content</div>;
@@ -298,14 +281,12 @@ function App() {
     let language = 'text';
     let text = content.text;
 
-    // Try to parse JSON
     if (content.mimeType.includes('json')) {
       try {
         const parsed = JSON.parse(content.text);
         text = JSON.stringify(parsed, null, 2);
         language = 'json';
       } catch (e) {
-        // Not valid JSON, keep as text
       }
     } else if (content.mimeType.includes('html')) {
       language = 'html';
@@ -318,14 +299,22 @@ function App() {
     }
 
     return (
-      <SyntaxHighlighter language={language} style={vscDarkPlus}>
+      <SyntaxHighlighter 
+        language={language} 
+        style={vscDarkPlus}
+        customStyle={{
+          backgroundColor: 'var(--background)',
+          borderRadius: '0.25rem',
+          padding: '1rem',
+          border: '1px solid var(--border)'
+        }}
+      >
         {text}
       </SyntaxHighlighter>
     );
   }
 
-  // Calculate total time for waterfall chart
-  const maxTime = harFile?.log.entries.reduce((max, entry) => 
+  const maxTime = harFile?.log.entries.reduce((max, entry) =>
     Math.max(max, entry.time), 0) || 0;
 
   return (
@@ -415,18 +404,15 @@ function App() {
                 <ScrollArea className="h-[calc(100vh-280px)]">
                   {harFile.log.entries
                     .filter(entry => {
-                      // Apply search term filter
-                      if (searchTerm && !entry.request.url.toLowerCase().includes(searchTerm.toLowerCase()) && 
+                      if (searchTerm && !entry.request.url.toLowerCase().includes(searchTerm.toLowerCase()) &&
                           !entry.request.method.toLowerCase().includes(searchTerm.toLowerCase())) {
                         return false;
                       }
 
-                      // Apply method filter
                       if (filterMethod !== "all" && entry.request.method !== filterMethod) {
                         return false;
                       }
 
-                      // Apply status filter
                       if (filterStatus !== "all") {
                         const statusCode = entry.response.status;
                         if (filterStatus === "2xx" && (statusCode < 200 || statusCode >= 300)) return false;
@@ -508,119 +494,130 @@ function App() {
                           <DialogTrigger asChild>
                             <Button>Replay Request</Button>
                           </DialogTrigger>
-                          <DialogContent className="sm:max-w-[800px]">
-                            <DialogHeader>
-                              <DialogTitle>Edit and Replay Request</DialogTitle>
-                            </DialogHeader>
-                            <div className="grid gap-4 py-4">
-                              <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="method" className="text-right">Method</Label>
-                                <Input 
-                                  id="method" 
-                                  value={editedRequest?.method || selectedEntry.request.method}
-                                  onChange={(e) => setEditedRequest({
-                                    ...(editedRequest || selectedEntry.request),
-                                    method: e.target.value
-                                  })}
-                                  className="col-span-3"
-                                />
-                              </div>
-                              <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="url" className="text-right">URL</Label>
-                                <Input 
-                                  id="url" 
-                                  value={editedRequest?.url || selectedEntry.request.url}
-                                  onChange={(e) => setEditedRequest({
-                                    ...(editedRequest || selectedEntry.request),
-                                    url: e.target.value
-                                  })}
-                                  className="col-span-3"
-                                />
-                              </div>
-                              <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="httpVersion" className="text-right">HTTP Version</Label>
-                                <Input 
-                                  id="httpVersion" 
-                                  value={editedRequest?.httpVersion || selectedEntry.request.httpVersion}
-                                  onChange={(e) => setEditedRequest({
-                                    ...(editedRequest || selectedEntry.request),
-                                    httpVersion: e.target.value
-                                  })}
-                                  className="col-span-3"
-                                />
-                              </div>
-                              <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="headers" className="text-right">Headers</Label>
-                                <textarea 
-                                  id="headers" 
-                                  value={editedRequest?.headers 
-                                    ? formatHeaders(editedRequest.headers)
-                                    : formatHeaders(selectedEntry.request.headers)
-                                  }
-                                  onChange={(e) => {
-                                    const headerLines = e.target.value.split('\n');
-                                    const headers = headerLines.map(line => {
-                                      const [name, ...valueParts] = line.split(':');
-                                      const value = valueParts.join(':').trim();
-                                      return { name, value };
-                                    });
-                                    setEditedRequest({
+                          <DialogContent className="sm:max-w-[800px] max-h-[90vh]">
+                            <ScrollArea className="h-full max-h-[calc(90vh-2rem)] pr-4">
+                              <DialogHeader>
+                                <DialogTitle>Edit and Replay Request</DialogTitle>
+                              </DialogHeader>
+                              <div className="grid gap-4 py-4">
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                  <Label htmlFor="method" className="text-right">Method</Label>
+                                  <Input 
+                                    id="method" 
+                                    value={editedRequest?.method || selectedEntry.request.method}
+                                    onChange={(e) => setEditedRequest({
                                       ...(editedRequest || selectedEntry.request),
-                                      headers
-                                    });
-                                  }}
-                                  className="col-span-3 min-h-[100px] p-2 border rounded"
-                                />
-                              </div>
-                              <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="body" className="text-right">Body</Label>
-                                <textarea 
-                                  id="body" 
-                                  value={editedRequest?.postData?.text || selectedEntry.request.postData?.text || ''}
-                                  onChange={(e) => {
-                                    const postData = {
-                                      ...(editedRequest?.postData || selectedEntry.request.postData || { mimeType: 'application/json' }),
-                                      text: e.target.value
-                                    };
-                                    setEditedRequest({
+                                      method: e.target.value
+                                    })}
+                                    className="col-span-3"
+                                  />
+                                </div>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                  <Label htmlFor="url" className="text-right">URL</Label>
+                                  <Input 
+                                    id="url" 
+                                    value={editedRequest?.url || selectedEntry.request.url}
+                                    onChange={(e) => setEditedRequest({
                                       ...(editedRequest || selectedEntry.request),
-                                      postData
-                                    });
-                                  }}
-                                  className="col-span-3 min-h-[150px] p-2 border rounded"
-                                />
-                              </div>
-                            </div>
-                            <div className="flex justify-end">
-                              <Button onClick={() => replayRequest(editedRequest || selectedEntry.request)}>
-                                Send Request
-                              </Button>
-                            </div>
-
-                            {replayResponse && (
-                              <div className="mt-4">
-                                <h3 className="font-bold mb-2">Response</h3>
-                                <div className="p-2 bg-secondary/10 rounded">
-                                  <div>Status: {replayResponse.status}</div>
-                                  <Accordion type="single" collapsible>
-                                    <AccordionItem value="headers">
-                                      <AccordionTrigger>Headers</AccordionTrigger>
-                                      <AccordionContent>
-                                        <pre className="text-xs">{JSON.stringify(replayResponse.headers, null, 2)}</pre>
-                                      </AccordionContent>
-                                    </AccordionItem>
-                                    <AccordionItem value="body">
-                                      <AccordionTrigger>Body</AccordionTrigger>
-                                      <AccordionContent>
-                                        <SyntaxHighlighter language="json" style={vscDarkPlus}>
-                                          {replayResponse.body}
-                                        </SyntaxHighlighter>
-                                      </AccordionContent>
-                                    </AccordionItem>
-                                  </Accordion>
+                                      url: e.target.value
+                                    })}
+                                    className="col-span-3"
+                                  />
+                                </div>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                  <Label htmlFor="httpVersion" className="text-right">HTTP Version</Label>
+                                  <Input 
+                                    id="httpVersion" 
+                                    value={editedRequest?.httpVersion || selectedEntry.request.httpVersion}
+                                    onChange={(e) => setEditedRequest({
+                                      ...(editedRequest || selectedEntry.request),
+                                      httpVersion: e.target.value
+                                    })}
+                                    className="col-span-3"
+                                  />
+                                </div>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                  <Label htmlFor="headers" className="text-right">Headers</Label>
+                                  <textarea 
+                                    id="headers" 
+                                    value={editedRequest?.headers 
+                                      ? formatHeaders(editedRequest.headers)
+                                      : formatHeaders(selectedEntry.request.headers)
+                                    }
+                                    onChange={(e) => {
+                                      const headerLines = e.target.value.split('\n');
+                                      const headers = headerLines.map(line => {
+                                        const [name, ...valueParts] = line.split(':');
+                                        const value = valueParts.join(':').trim();
+                                        return { name, value };
+                                      });
+                                      setEditedRequest({
+                                        ...(editedRequest || selectedEntry.request),
+                                        headers
+                                      });
+                                    }}
+                                    className="col-span-3 min-h-[100px] p-2 border rounded bg-card"
+                                  />
+                                </div>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                  <Label htmlFor="body" className="text-right">Body</Label>
+                                  <textarea 
+                                    id="body" 
+                                    value={editedRequest?.postData?.text || selectedEntry.request.postData?.text || ''}
+                                    onChange={(e) => {
+                                      const postData = {
+                                        ...(editedRequest?.postData || selectedEntry.request.postData || { mimeType: 'application/json' }),
+                                        text: e.target.value
+                                      };
+                                      setEditedRequest({
+                                        ...(editedRequest || selectedEntry.request),
+                                        postData
+                                      });
+                                    }}
+                                    className="col-span-3 min-h-[150px] p-2 border rounded bg-card"
+                                  />
                                 </div>
                               </div>
-                            )}
+                              <div className="flex justify-end">
+                                <Button onClick={() => replayRequest(editedRequest || selectedEntry.request)}>
+                                  Send Request
+                                </Button>
+                              </div>
+
+                              {replayResponse && (
+                                <div className="mt-4">
+                                  <h3 className="font-bold mb-2">Response</h3>
+                                  <div className="p-2 bg-card border rounded">
+                                    <div>Status: {replayResponse.status}</div>
+                                    <Accordion type="single" collapsible>
+                                      <AccordionItem value="headers">
+                                        <AccordionTrigger>Headers</AccordionTrigger>
+                                        <AccordionContent>
+                                          <pre className="text-xs">{JSON.stringify(replayResponse.headers, null, 2)}</pre>
+                                        </AccordionContent>
+                                      </AccordionItem>
+                                      <AccordionItem value="body">
+                                        <AccordionTrigger>Body</AccordionTrigger>
+                                        <AccordionContent>
+                                          <SyntaxHighlighter 
+                                            language="json" 
+                                            style={vscDarkPlus}
+                                            customStyle={{
+                                              backgroundColor: 'var(--background)',
+                                              borderRadius: '0.25rem',
+                                              padding: '1rem',
+                                              border: '1px solid var(--border)'
+                                            }}
+                                          >
+                                            {replayResponse.body}
+                                          </SyntaxHighlighter>
+                                        </AccordionContent>
+                                      </AccordionItem>
+                                    </Accordion>
+                                  </div>
+                                </div>
+                              )}
+                            </ScrollArea>
                           </DialogContent>
                         </Dialog>
                       </CardTitle>
@@ -683,6 +680,12 @@ function App() {
                                 <SyntaxHighlighter 
                                   language={selectedEntry.request.postData.mimeType.includes('json') ? 'json' : 'text'} 
                                   style={vscDarkPlus}
+                                  customStyle={{
+                                    backgroundColor: 'var(--background)',
+                                    borderRadius: '0.25rem',
+                                    padding: '1rem',
+                                    border: '1px solid var(--border)'
+                                  }}
                                 >
                                   {selectedEntry.request.postData.text}
                                 </SyntaxHighlighter>

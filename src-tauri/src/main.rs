@@ -173,9 +173,7 @@ async fn replay_request(request: HarRequest) -> Result<String, String> {
 
     let mut req_builder = client.request(method, &request.url);
 
-    // Add headers
     for header in request.headers {
-        // Skip invalid header names instead of failing the entire request
         if let Ok(header_name) = reqwest::header::HeaderName::from_bytes(header.name.as_bytes()) {
             if let Ok(header_value) = reqwest::header::HeaderValue::from_str(&header.value) {
                 req_builder = req_builder.header(header_name, header_value);
@@ -183,7 +181,6 @@ async fn replay_request(request: HarRequest) -> Result<String, String> {
         }
     }
 
-    // Add body if it's a POST request
     if let Some(post_data) = request.post_data {
         if let Some(text) = post_data.text {
             req_builder = req_builder.body(text);
@@ -195,7 +192,6 @@ async fn replay_request(request: HarRequest) -> Result<String, String> {
     let headers = response.headers().clone();
     let body = response.text().await.map_err(|e| e.to_string())?;
 
-    // Convert HeaderMap to Vec<HarHeader> for serialization
     let header_vec: Vec<HarHeader> = headers
         .iter()
         .map(|(name, value)| {

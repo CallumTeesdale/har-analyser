@@ -37,7 +37,6 @@ const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
 >(({ className, children, ...props }, ref) => {
-  // Generate a unique ID for aria-describedby if not provided
   const [descriptionId] = React.useState(() => props["aria-describedby"] || `dialog-description-${Math.random().toString(36).substring(2, 9)}`);
 
   return (
