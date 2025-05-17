@@ -4,23 +4,22 @@ A cross-platform HTTP Archive (HAR) file analyzer built with Tauri, React, TypeS
 
 ## Features
 
-- **HAR File Viewing**: Open and analyze HAR files with a clean, intuitive interface
+- **HAR File Viewing**: Open and analyze HAR files
 - **Request/Response Details**: View detailed information about HTTP requests and responses
 - **Waterfall Visualization**: See timing information in a visual waterfall chart
 - **Request Replay**: Edit and replay requests directly from the application
-- **Content Formatting**: Automatically formats JSON, HTML, CSS, and other content types
+- **Content Formatting**: Automatically formats JSON, HTML, CSS
 - **Cross-Platform**: Works on Windows, macOS, and Linux
 
 ## Screenshots
 
-(Screenshots will be added after the first release)
 
 ## Development
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) (v16 or later)
-- [Rust](https://www.rust-lang.org/) (v1.60 or later)
+- [Node.js](https://nodejs.org/) 
+- [Rust](https://www.rust-lang.org/) 
 - [Tauri CLI](https://tauri.app/v1/guides/getting-started/prerequisites)
 
 ### CI/CD
@@ -47,7 +46,7 @@ To create a new release:
 
 1. Clone the repository:
    ```
-   git clone https://github.com/yourusername/har-analyser.git
+   git clone https://github.com/callumteesdale/har-analyser.git
    cd har-analyser
    ```
 

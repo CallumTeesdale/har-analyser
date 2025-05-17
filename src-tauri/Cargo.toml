@@ -2,8 +2,8 @@
 name = "har-analyser"
 version = "0.1.0"
 description = "HAR file analyzer application"
-authors = ["You"]
-license = ""
+authors = ["Callum Teesdale"]
+license = "MIT"
 repository = ""
 edition = "2021"
 
