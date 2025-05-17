@@ -169,7 +169,40 @@ function App() {
   // Function to replay a request
   async function replayRequest(request: HarRequest) {
     try {
-      const response = await invoke("replay_request", { request });
+      // Convert camelCase fields to snake_case for Rust backend
+      const rustRequest = {
+        ...request,
+        http_version: request.httpVersion,
+        query_string: request.queryString,
+        post_data: request.postData ? {
+          ...request.postData,
+          mime_type: request.postData.mimeType,
+          params: request.postData.params ? request.postData.params.map(param => ({
+            ...param,
+            file_name: param.fileName,
+            content_type: param.contentType
+          })) : undefined
+        } : undefined,
+        headers_size: request.headersSize,
+        body_size: request.bodySize
+      };
+
+      // Remove the original camelCase fields to avoid duplicates
+      delete (rustRequest as any).httpVersion;
+      delete (rustRequest as any).queryString;
+      if (rustRequest.post_data) {
+        delete (rustRequest.post_data as any).mimeType;
+        if (rustRequest.post_data.params) {
+          rustRequest.post_data.params.forEach(param => {
+            delete (param as any).fileName;
+            delete (param as any).contentType;
+          });
+        }
+      }
+      delete (rustRequest as any).headersSize;
+      delete (rustRequest as any).bodySize;
+
+      const response = await invoke("replay_request", { request: rustRequest });
       setReplayResponse(JSON.parse(response as string));
     } catch (error) {
       console.error("Error replaying request:", error);
@@ -333,6 +366,18 @@ function App() {
                                   onChange={(e) => setEditedRequest({
                                     ...(editedRequest || selectedEntry.request),
                                     url: e.target.value
+                                  })}
+                                  className="col-span-3"
+                                />
+                              </div>
+                              <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="httpVersion" className="text-right">HTTP Version</Label>
+                                <Input 
+                                  id="httpVersion" 
+                                  value={editedRequest?.httpVersion || selectedEntry.request.httpVersion}
+                                  onChange={(e) => setEditedRequest({
+                                    ...(editedRequest || selectedEntry.request),
+                                    httpVersion: e.target.value
                                   })}
                                   className="col-span-3"
                                 />

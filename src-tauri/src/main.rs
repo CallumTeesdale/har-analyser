@@ -175,7 +175,12 @@ async fn replay_request(request: HarRequest) -> Result<String, String> {
 
     // Add headers
     for header in request.headers {
-        req_builder = req_builder.header(header.name, header.value);
+        // Skip invalid header names instead of failing the entire request
+        if let Ok(header_name) = reqwest::header::HeaderName::from_bytes(header.name.as_bytes()) {
+            if let Ok(header_value) = reqwest::header::HeaderValue::from_str(&header.value) {
+                req_builder = req_builder.header(header_name, header_value);
+            }
+        }
     }
 
     // Add body if it's a POST request
