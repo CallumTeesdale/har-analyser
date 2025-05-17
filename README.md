@@ -12,7 +12,7 @@ A cross-platform HTTP Archive (HAR) file analyzer built with Tauri, React, TypeS
 - **Cross-Platform**: Works on Windows, macOS, and Linux
 
 ## Screenshots
-
+![HAR Analyser Home Screen](./doc/home.png)
 
 ## Development
 
