@@ -194,11 +194,9 @@ async fn replay_request(request: HarRequest) -> Result<String, String> {
 
     let header_vec: Vec<HarHeader> = headers
         .iter()
-        .map(|(name, value)| {
-            HarHeader {
-                name: name.to_string(),
-                value: value.to_str().unwrap_or("").to_string(),
-            }
+        .map(|(name, value)| HarHeader {
+            name: name.to_string(),
+            value: value.to_str().unwrap_or("").to_string(),
         })
         .collect();
 
@@ -213,6 +211,10 @@ async fn replay_request(request: HarRequest) -> Result<String, String> {
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_http::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![load_har_file, replay_request])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
