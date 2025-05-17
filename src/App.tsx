@@ -140,6 +140,34 @@ function App() {
   const [selectedEntry, setSelectedEntry] = useState<HarEntry | null>(null);
   const [editedRequest, setEditedRequest] = useState<HarRequest | null>(null);
   const [replayResponse, setReplayResponse] = useState<any>(null);
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [filterMethod, setFilterMethod] = useState<string>("all");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [darkMode, setDarkMode] = useState<boolean>(() => {
+    // Check if user has a preference stored
+    const savedPreference = localStorage.getItem("darkMode");
+    if (savedPreference !== null) {
+      return savedPreference === "true";
+    }
+    // Otherwise check system preference
+    return window.matchMedia("(prefers-color-scheme: dark)").matches;
+  });
+
+  // Apply dark mode class to document
+  React.useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    // Save preference to localStorage
+    localStorage.setItem("darkMode", darkMode.toString());
+  }, [darkMode]);
+
+  // Function to toggle dark mode
+  const toggleDarkMode = () => {
+    setDarkMode(prev => !prev);
+  };
 
   // Function to open and load a HAR file
   async function openHarFile() {
@@ -214,6 +242,53 @@ function App() {
     return headers.map(h => `${h.name}: ${h.value}`).join('\n');
   }
 
+  // Function to export request/response data
+  function exportRequestData(entry: HarEntry) {
+    const exportData = {
+      request: {
+        method: entry.request.method,
+        url: entry.request.url,
+        httpVersion: entry.request.httpVersion,
+        headers: entry.request.headers,
+        queryString: entry.request.queryString,
+        postData: entry.request.postData,
+      },
+      response: {
+        status: entry.response.status,
+        statusText: entry.response.statusText,
+        httpVersion: entry.response.httpVersion,
+        headers: entry.response.headers,
+        content: entry.response.content,
+      },
+      timing: entry.timings,
+      serverIPAddress: entry.serverIPAddress,
+      startedDateTime: entry.startedDateTime,
+      time: entry.time,
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+
+    // Create a filename based on the request
+    let filename;
+    try {
+      const urlObj = new URL(entry.request.url);
+      const host = urlObj.host.replace(/[^a-z0-9]/gi, '_');
+      const path = urlObj.pathname.replace(/[^a-z0-9]/gi, '_');
+      filename = `${entry.request.method}_${host}${path}.json`;
+    } catch (e) {
+      filename = `request_${Date.now()}.json`;
+    }
+
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   // Function to determine content type and format accordingly
   function formatContent(content: HarContent): JSX.Element {
     if (!content.text) {
@@ -257,7 +332,33 @@ function App() {
     <div className="container mx-auto p-4">
       <header className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">HAR Analyser</h1>
-        <Button onClick={openHarFile}>Open HAR File</Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="icon" 
+            onClick={toggleDarkMode} 
+            title={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+          >
+            {darkMode ? (
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="5"></circle>
+                <line x1="12" y1="1" x2="12" y2="3"></line>
+                <line x1="12" y1="21" x2="12" y2="23"></line>
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                <line x1="1" y1="12" x2="3" y2="12"></line>
+                <line x1="21" y1="12" x2="23" y2="12"></line>
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+              </svg>
+            )}
+          </Button>
+          <Button onClick={openHarFile}>Open HAR File</Button>
+        </div>
       </header>
 
       {harFile ? (
@@ -269,8 +370,74 @@ function App() {
                 <CardTitle>Requests ({harFile.log.entries.length})</CardTitle>
               </CardHeader>
               <CardContent>
-                <ScrollArea className="h-[calc(100vh-200px)]">
-                  {harFile.log.entries.map((entry, index) => (
+                <div className="space-y-2 mb-4">
+                  <Input 
+                    placeholder="Search requests..." 
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label htmlFor="method-filter" className="text-xs">Method</Label>
+                      <select 
+                        id="method-filter"
+                        className="w-full p-2 rounded border border-input bg-background text-sm"
+                        value={filterMethod}
+                        onChange={(e) => setFilterMethod(e.target.value)}
+                      >
+                        <option value="all">All Methods</option>
+                        <option value="GET">GET</option>
+                        <option value="POST">POST</option>
+                        <option value="PUT">PUT</option>
+                        <option value="DELETE">DELETE</option>
+                        <option value="PATCH">PATCH</option>
+                        <option value="OPTIONS">OPTIONS</option>
+                        <option value="HEAD">HEAD</option>
+                      </select>
+                    </div>
+                    <div>
+                      <Label htmlFor="status-filter" className="text-xs">Status</Label>
+                      <select 
+                        id="status-filter"
+                        className="w-full p-2 rounded border border-input bg-background text-sm"
+                        value={filterStatus}
+                        onChange={(e) => setFilterStatus(e.target.value)}
+                      >
+                        <option value="all">All Status</option>
+                        <option value="2xx">2xx Success</option>
+                        <option value="3xx">3xx Redirection</option>
+                        <option value="4xx">4xx Client Error</option>
+                        <option value="5xx">5xx Server Error</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                <ScrollArea className="h-[calc(100vh-280px)]">
+                  {harFile.log.entries
+                    .filter(entry => {
+                      // Apply search term filter
+                      if (searchTerm && !entry.request.url.toLowerCase().includes(searchTerm.toLowerCase()) && 
+                          !entry.request.method.toLowerCase().includes(searchTerm.toLowerCase())) {
+                        return false;
+                      }
+
+                      // Apply method filter
+                      if (filterMethod !== "all" && entry.request.method !== filterMethod) {
+                        return false;
+                      }
+
+                      // Apply status filter
+                      if (filterStatus !== "all") {
+                        const statusCode = entry.response.status;
+                        if (filterStatus === "2xx" && (statusCode < 200 || statusCode >= 300)) return false;
+                        if (filterStatus === "3xx" && (statusCode < 300 || statusCode >= 400)) return false;
+                        if (filterStatus === "4xx" && (statusCode < 400 || statusCode >= 500)) return false;
+                        if (filterStatus === "5xx" && (statusCode < 500 || statusCode >= 600)) return false;
+                      }
+
+                      return true;
+                    })
+                    .map((entry, index) => (
                     <div 
                       key={index}
                       className={`p-2 mb-2 cursor-pointer rounded ${selectedEntry === entry ? 'bg-primary/10' : 'hover:bg-secondary/10'}`}
@@ -542,7 +709,21 @@ function App() {
                 <TabsContent value="response">
                   <Card>
                     <CardHeader>
-                      <CardTitle>Response</CardTitle>
+                      <CardTitle className="flex justify-between">
+                        <span>Response</span>
+                        <Button 
+                          variant="outline"
+                          onClick={() => exportRequestData(selectedEntry)}
+                          title="Export request/response data as JSON"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                          </svg>
+                          Export
+                        </Button>
+                      </CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="mb-4">
@@ -697,13 +878,166 @@ function App() {
                 </TabsContent>
               </Tabs>
             ) : (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center p-10">
-                  <p className="text-center text-muted-foreground mb-4">
-                    Select a request from the list to view details
-                  </p>
-                </CardContent>
-              </Card>
+              <Tabs defaultValue="summary">
+                <TabsList className="mb-4">
+                  <TabsTrigger value="summary">Summary</TabsTrigger>
+                  <TabsTrigger value="details">Details</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="summary">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>HAR File Summary</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Basic Statistics */}
+                        <div className="space-y-4">
+                          <h3 className="text-lg font-semibold">Basic Statistics</h3>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="font-medium">Total Requests:</div>
+                            <div>{harFile.log.entries.length}</div>
+
+                            <div className="font-medium">Total Size:</div>
+                            <div>{(harFile.log.entries.reduce((sum, entry) => sum + entry.response.bodySize, 0) / 1024).toFixed(2)} KB</div>
+
+                            <div className="font-medium">Average Response Time:</div>
+                            <div>{(harFile.log.entries.reduce((sum, entry) => sum + entry.time, 0) / harFile.log.entries.length).toFixed(2)} ms</div>
+
+                            <div className="font-medium">Slowest Request:</div>
+                            <div>
+                              {(() => {
+                                const slowest = harFile.log.entries.reduce((prev, current) => 
+                                  (prev.time > current.time) ? prev : current);
+                                try {
+                                  return `${slowest.request.method} ${new URL(slowest.request.url).pathname} (${slowest.time.toFixed(2)} ms)`;
+                                } catch (e) {
+                                  return `${slowest.request.method} ${slowest.request.url} (${slowest.time.toFixed(2)} ms)`;
+                                }
+                              })()}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Method Distribution */}
+                        <div className="space-y-4">
+                          <h3 className="text-lg font-semibold">HTTP Methods</h3>
+                          {(() => {
+                            const methodCounts = harFile.log.entries.reduce((acc, entry) => {
+                              acc[entry.request.method] = (acc[entry.request.method] || 0) + 1;
+                              return acc;
+                            }, {} as Record<string, number>);
+
+                            return Object.entries(methodCounts).map(([method, count]) => (
+                              <div key={method} className="space-y-1">
+                                <div className="flex justify-between">
+                                  <span className="font-medium">{method}</span>
+                                  <span>{count} ({((count / harFile.log.entries.length) * 100).toFixed(1)}%)</span>
+                                </div>
+                                <div className="h-2 bg-secondary/20 rounded-full">
+                                  <div 
+                                    className="h-full bg-primary rounded-full" 
+                                    style={{ width: `${(count / harFile.log.entries.length) * 100}%` }}
+                                  />
+                                </div>
+                              </div>
+                            ));
+                          })()}
+                        </div>
+
+                        {/* Status Code Distribution */}
+                        <div className="space-y-4">
+                          <h3 className="text-lg font-semibold">Status Codes</h3>
+                          {(() => {
+                            const statusGroups = {
+                              "2xx Success": 0,
+                              "3xx Redirection": 0,
+                              "4xx Client Error": 0,
+                              "5xx Server Error": 0,
+                              "Other": 0
+                            };
+
+                            harFile.log.entries.forEach(entry => {
+                              const status = entry.response.status;
+                              if (status >= 200 && status < 300) statusGroups["2xx Success"]++;
+                              else if (status >= 300 && status < 400) statusGroups["3xx Redirection"]++;
+                              else if (status >= 400 && status < 500) statusGroups["4xx Client Error"]++;
+                              else if (status >= 500 && status < 600) statusGroups["5xx Server Error"]++;
+                              else statusGroups["Other"]++;
+                            });
+
+                            return Object.entries(statusGroups)
+                              .filter(([_, count]) => count > 0)
+                              .map(([group, count]) => (
+                                <div key={group} className="space-y-1">
+                                  <div className="flex justify-between">
+                                    <span className="font-medium">{group}</span>
+                                    <span>{count} ({((count / harFile.log.entries.length) * 100).toFixed(1)}%)</span>
+                                  </div>
+                                  <div className="h-2 bg-secondary/20 rounded-full">
+                                    <div 
+                                      className={`h-full rounded-full ${
+                                        group === "2xx Success" ? "bg-green-500" :
+                                        group === "3xx Redirection" ? "bg-blue-500" :
+                                        group === "4xx Client Error" ? "bg-yellow-500" :
+                                        group === "5xx Server Error" ? "bg-red-500" : "bg-gray-500"
+                                      }`}
+                                      style={{ width: `${(count / harFile.log.entries.length) * 100}%` }}
+                                    />
+                                  </div>
+                                </div>
+                            ));
+                          })()}
+                        </div>
+
+                        {/* Content Type Distribution */}
+                        <div className="space-y-4">
+                          <h3 className="text-lg font-semibold">Content Types</h3>
+                          {(() => {
+                            const contentTypes = harFile.log.entries.reduce((acc, entry) => {
+                              const mimeType = entry.response.content.mimeType.split(';')[0].trim();
+                              const type = mimeType.includes('/') 
+                                ? mimeType.split('/')[1] 
+                                : mimeType;
+
+                              acc[type] = (acc[type] || 0) + 1;
+                              return acc;
+                            }, {} as Record<string, number>);
+
+                            return Object.entries(contentTypes)
+                              .sort((a, b) => b[1] - a[1])
+                              .slice(0, 5)
+                              .map(([type, count]) => (
+                                <div key={type} className="space-y-1">
+                                  <div className="flex justify-between">
+                                    <span className="font-medium">{type || 'unknown'}</span>
+                                    <span>{count} ({((count / harFile.log.entries.length) * 100).toFixed(1)}%)</span>
+                                  </div>
+                                  <div className="h-2 bg-secondary/20 rounded-full">
+                                    <div 
+                                      className="h-full bg-purple-500 rounded-full" 
+                                      style={{ width: `${(count / harFile.log.entries.length) * 100}%` }}
+                                    />
+                                  </div>
+                                </div>
+                            ));
+                          })()}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="details">
+                  <Card>
+                    <CardContent className="flex flex-col items-center justify-center p-10">
+                      <p className="text-center text-muted-foreground mb-4">
+                        Select a request from the list to view details
+                      </p>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
             )}
           </div>
         </div>
